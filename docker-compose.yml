@@ -5,81 +5,177 @@ services:
     container_name: mysql-server
     ports:
       - 3306:3306
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix.server
+    env_file:
+      - ./common/env/env_mysql
+#    environment:
+#      MYSQL_ROOT_PASSWORD: rootpassword
+#      MYSQL_DATABASE: zabbix
+#      MYSQL_USER: zabbix
+#      MYSQL_PASSWORD: zabbix.server
     volumes:
-      - /data/zabbix/mysql:/var/lib/mysql                              
+      - /data/zabbix/mysql:/var/lib/mysql:rw                              
     networks:
-      - zabbix-server-network
+      zbx_net_backend:
+        aliases:
+          - mysql-server
+        ipv4_address: 172.16.239.2
     command:
       --character-set-server=utf8
       --collation-server=utf8_bin
+#      --default-authentication-plugin=mysql_native_password
 
   zabbix-web-apache-mysql:
     build:
-      context: ./zabbix-server
+      context: ./zabbix-web
       dockerfile: Dockerfile
-   # image: zabbix/zabbix-web-apache-mysql
+#    image: zabbix/zabbix-web-apache-mysql
     container_name: zabbix-web-apache-mysql
-    environment:
-      DB_SERVER_HOST: mysql-server
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix.server
-      MYSQL_ROOT_PASSWORD: rootpassword
-      ZBX_SERVER_HOST: zabbix-server
-      PHP_TZ: Asia/Shanghai
+#    environment:
+#      DB_SERVER_HOST: mysql-server
+#      MYSQL_DATABASE: zabbix
+#      MYSQL_USER: zabbix
+#      MYSQL_PASSWORD: zabbix.server
+#      MYSQL_ROOT_PASSWORD: rootpassword
+#      ZBX_SERVER_HOST: zabbix-server
+#      PHP_TZ: Asia/Shanghai
+    env_file:
+      - ./common/env/env_web
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./zbx_env/usr/share/zabbix/modules/:/usr/share/zabbix/modules/:ro
+#      - ./zbx_enf/etc/ssl/apache2:/etc/ssl/apache2:ro
     ports:
       - 80:8080
+#      - 443:8443
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '1.0'
+#          memory: 512M
+#        reservations:
+#          cpus: '0.5'
+#          memory: 256M
     links:
       - mysql-server
       - zabbix-server
     depends_on:
       - mysql-server
-      - zabbix-server                            
+      - zabbix-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
-      - zabbix-server-network
+      zbx_net_backend:
+        aliases:
+          - zabbix-web-apache-mysql
+        ipv4_address: 172.16.239.3
+      zbx_net_frontend:
+    stop_grace_period: 10s
+    sysctls:
+      - net.core.somaxconn=2048
 
   zabbix-server:
     image: zabbix/zabbix-server-mysql
     container_name: zabbix-server
-    environment:
-      DB_SERVER_HOST: mysql-server
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix.server
-      MYSQL_ROOT_PASSWORD: rootpassword
-      ZBX_LOGTYPE: file
-      ZBX_LOG_FILE: /tmp/ser.log 
+#    environment:
+#      DB_SERVER_HOST: mysql-server
+#      MYSQL_DATABASE: zabbix
+#      MYSQL_USER: zabbix
+#      MYSQL_PASSWORD: zabbix.server
+#      MYSQL_ROOT_PASSWORD: rootpassword
+#      ZBX_LOGTYPE: file
+#      ZBX_LOG_FILE: /tmp/ser.log 
+    env_file:
+      - ./common/env/env_server
     ports:
       - 10051:10051
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro 
+      - ./zbx_env/usr/lib/zabbix/alertscripts:/usr/lib/zabbix/alertscripts:ro
+      - ./zbx_env/usr/lib/zabbix/externalscripts:/usr/lib/zabbix/externalscripts:ro
+      - ./zbx_env/var/lib/zabbix/export:/var/lib/zabbix/export:rw
+      - ./zbx_env/var/lib/zabbix/modules:/var/lib/zabbix/modules:ro
+      - ./zbx_env/var/lib/zabbix/enc:/var/lib/zabbix/enc:ro
+      - ./zbx_env/var/lib/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
+      - ./zbx_env/var/lib/zabbix/mibs:/var/lib/zabbix/mibs:ro
     links:
-      - mysql-server
+      - mysql-server:mysql-server
     depends_on:
-      - mysql-server                             
+      - mysql-server
+    ulimits:
+      nproc: 65535 #用户进程数
+      nofile:  #最大打开文件数
+        soft: 20000
+        hard: 40000
+ #   deploy:
+ #    resources:
+ #      limits:
+ #        cpus: '1.0'
+ #        memory: 1G
+ #      reservations:
+ #        cpus: '0.5'
+ #        memory: 512M                             
     networks:
-      - zabbix-server-network
+      zbx_net_backend:
+        aliases:
+          - zabbix-server
+        ipv4_address: 172.16.239.4
+      zbx_net_frontend:
+    stop_grace_period: 30s
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65000
+      - net.ipv4.conf.all.accept_redirects=0
+      - net.ipv4.conf.all.secure_redirects=0
+      - net.ipv4.conf.all.send_redirects=0
 
   zabbix-agent:
     image: zabbix/zabbix-agent
     container_name: zabbix-server-agent
     ports:
       - 10050:10050
+    env_file:
+      - ./common/env/env_agent
+    privileged: true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./zbx_env/etc/zabbix/zabbix_agentd.d:/etc/zabbix/zabbix_agentd.d:ro
+      - ./zbx_env/var/lib/zabbix/modules:/var/lib/zabbix/modules:ro
+      - ./zbx_env/var/lib/zabbix/enc:/var/lib/zabbix/enc:ro
+      - ./zbx_env/var/lib/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
     links:
       - zabbix-server:zabbix-server
+  #  deploy:
+  #    resources:
+  #      limits:
+  #        cpus: '0.2'
+  #        memory: 128M
+  #      reservations:
+  #        cpus: '0.1'
+  #        memory: 64M
+  #    mode: global
     depends_on:
       - zabbix-server                             
     networks:
-      - zabbix-server-network
+      zbx_net_backend:
+        aliases:
+          - zabbix-agent
+        ipv4_address: 172.16.239.5
 
 networks:
-    zabbix-server-network:
+    zbx_net_frontend:
       driver: bridge
       ipam:
         driver: default
         config:
-        - subnet: 172.16.100.0/24
-
+        - subnet: 172.16.238.0/24
+    zbx_net_backend:
+      driver: bridge
+      internal: true
+      ipam:
+        driver: default
+        config:
+        - subnet: 172.16.239.0/24
