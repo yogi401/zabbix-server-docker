@@ -1,0 +1,7 @@
+DB_SERVER_HOST=mysql-server
+MYSQL_DATABASE=zabbix
+MYSQL_USER=zabbix
+MYSQL_PASSWORD=zabbix.server
+MYSQL_ROOT_PASSWORD=rootpassword
+ZBX_SERVER_HOST=zabbix-server
+PHP_TZ=Asia/Shanghai
