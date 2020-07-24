@@ -1,6 +1,6 @@
 ## docker-compose 一键部署zabbix-proxy,zabbix-agent
 基于官方文档，增加了固定IP配置  
-zabbix-server：172.16.239.4
+zabbix-server：172.16.239.4  
 zabbix-web-apache-mysql:172.16.239.3  
 zabbix-server-agent: 172.16.239.5  
 mysql-server: 172.16.239.2
@@ -53,11 +53,13 @@ ZBX_SERVER_PORT=10051
 ZBX_LISTENPORT=10050
 ```
 
-### 使用方法
+### 使用方法  
+
 ```
-mkdir zabbix-server
-cd zabbix-server
+mkdir ~/zabbix-server
+cd ~/zabbix-server
 git clone https://github.com/yogi401/zabbix-server-docker.git
+cd zabbix-server-docker
 docker-compose up -d
 ```
 
