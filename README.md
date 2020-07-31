@@ -1,4 +1,4 @@
-## docker-compose 一键部署zabbix-proxy,zabbix-agent
+## docker-compose 一键部署zabbix-server,zabbix-proxy,zabbix-agent
 基于官方文档，增加了固定IP配置  
 zabbix-server：172.16.239.4  
 zabbix-web-apache-mysql:172.16.239.3  
